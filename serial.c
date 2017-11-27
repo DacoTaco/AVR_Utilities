@@ -132,7 +132,7 @@ void cprintf( char *text,... )
 	usart_SendString(output);
 }
 
-//Interrupt handler of entering characters
+//Interrupt handler of receiving characters
 ISR(USART_RXC_vect)
 {
 	char ReceivedByte;
