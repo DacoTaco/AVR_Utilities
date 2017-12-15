@@ -17,6 +17,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include <inttypes.h>
 #include <avr/io.h>
 #include <avr/interrupt.h>
+#include <util/delay.h>
 #include <string.h> 
 #include <stdarg.h>
 #include <stdio.h>
@@ -37,25 +38,6 @@ char _init = 0;
 
 //callbacks
 void (*cb_recv)(char); 
-			
-//Inialise the Console			
-void initConsole(void) {
-    // Set baud rate
-    UBRRH = (uint8_t)(BAUDRATE>>8);
-    UBRRL = (uint8_t)BAUDRATE;
-    // Enable receiver and transmitter
-    UCSRB = (1<<RXEN)|(1<<TXEN);
-    // Set frame format: 8data, 1stop bit
-    UCSRC = (1<<URSEL)|(3<<UCSZ0);
-	
-	//enable the receive interrupt
-	UCSRB |= (1 << RXCIE);
-	//enable interrupts in the chip, cli(); disables them again
-	sei();
-	
-	_init = 1;
-	return;
-}
 
 //Override the Recv callback, or return it to default by giving NULL
 void setRecvCallback(void* cb)
@@ -82,14 +64,41 @@ void usart_SendString(char *s) {
 
 //Wait untill a single Char is received
 //kinda useless as we have the interrupt xD
-char usart_GetChar(void) {
+unsigned char usart_GetChar(void) {
 	if(_init == 0)
 		return 0;
     // Wait for incoming data
     while ( !(UCSRA & (_BV(RXC))) );
     // Return the data
     return UDR;
-}                    
+}       
+
+//Inialise the Console			
+void initConsole(void) {
+    // Set baud rate
+    UBRRH = (uint8_t)(BAUDRATE>>8);
+    UBRRL = (uint8_t)BAUDRATE;
+    // Enable receiver and transmitter
+    UCSRB = (1<<RXEN)|(1<<TXEN);
+	//enable the receive interrupt
+	//TODO : make function to enable and disable it, to replace the cli & sei in code
+	UCSRB |= (1 << RXCIE);
+    // Set frame format: 8data, 1stop bit
+    UCSRC = (1<<URSEL)|(3<<UCSZ0);	
+	
+	cb_recv = usart_SendChar;
+	
+	//enable interrupts in the chip, cli(); disables them again
+	sei();
+	
+	_init = 1;
+	return;
+}
+//Wait and retrieve 1 byte
+unsigned char Serial_GetByte(void)
+{
+	return usart_GetChar();
+}             
 
 //Print a full string
 void cprintf_string(char* str)
@@ -101,7 +110,7 @@ void cprintf_string(char* str)
 }
 
 //Print a single character
-void cprintf_char( char text )
+void cprintf_char( unsigned char text )
 {
 	if(_init == 0)
 		return;

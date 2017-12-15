@@ -15,6 +15,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 void initConsole(void);
 void setRecvCallback(void* cb);
-void cprintf_char( char text );
+unsigned char Serial_GetByte(void);
+void cprintf_char( unsigned char text );
 void cprintf_string(char* str);
 void cprintf( char *text,... );   
