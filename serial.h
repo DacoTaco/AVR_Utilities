@@ -13,9 +13,26 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
 
+//comment this out to reduce code size, but remove support for Variadic functions like in cprintf
+#define _VA_SUPPORT
+
+#ifdef SAVE_SPACE
+#undef _VA_SUPPORT
+#endif
+
+#ifdef _VA_SUPPORT
+#define CPRINTF_STR_NAME cprintf_string
+#else
+#define CPRINTF_STR_NAME cprintf
+#endif
+
 void initConsole(void);
 void setRecvCallback(void* cb);
 unsigned char Serial_GetByte(void);
 void cprintf_char( unsigned char text );
-void cprintf_string(char* str);
-void cprintf( char *text,... );   
+
+#ifdef _VA_SUPPORT
+void cprintf( char *text,... ); 
+#endif 
+
+void CPRINTF_STR_NAME(char* str);
