@@ -27,7 +27,13 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #define _BUFFER_SIZE 64
 
 //Connection info
-#define BAUD 9600                                   // define baud
+
+//define CPU frequency here if its not defined in the Makefile
+#ifndef F_CPU
+#define F_CPU 8000000UL
+#endif
+
+#define BAUD 38400//19200//9600                                   // define baud
 #define BAUDRATE ((F_CPU)/(BAUD*16UL)-1)			// set baud rate value for UBRR
 
 char _init = 0;
@@ -96,7 +102,7 @@ void initConsole(void) {
 	return;
 }
 //Wait and retrieve 1 byte
-unsigned char Serial_GetByte(void)
+unsigned char Serial_ReadByte(void)
 {
 	if(_init == 0)
 		return 0x00;
