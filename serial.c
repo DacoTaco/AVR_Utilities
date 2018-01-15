@@ -38,6 +38,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #define BAUD 9600    
 #endif
 
+// define baudrate
 #define BAUDRATE ((F_CPU)/(BAUD*16UL)-1)			// set baud rate value for UBRR
 
 char _init = 0;

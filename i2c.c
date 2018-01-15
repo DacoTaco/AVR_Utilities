@@ -27,13 +27,15 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 //the PCF8575 runs at 400khz... :/
 /*formula according to the ATMega8 documentation : 
 	freq = F_CPU/ ( 16 + 2(TWBR)*(Prescaler) */
-#define SCL_CLOCK  200000L
+#ifndef SCL_CLOCK
+#define SCL_CLOCK  100000L
+#endif
 
 void i2c_Init(void)
 {
     //set SCL to SCL_CLOCK
     TWSR = 0x00;
-    TWBR = 0x0C;//((F_CPU/SCL_CLOCK)-16)/2;
+    TWBR = ((F_CPU/SCL_CLOCK)-16)/2; //0x0C;
     //enable TWI
     TWCR = (1<<TWEN);
 }
