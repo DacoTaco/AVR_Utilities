@@ -41,14 +41,14 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 // define baudrate
 #define BAUDRATE ((F_CPU)/(BAUD*16UL)-1)			// set baud rate value for UBRR
 
-char _init = 0;
+char _serial_init = 0;
 
 
 //callbacks
 void (*cb_recv)(char); 
 
 //Override the Recv callback, or return it to default by giving NULL
-void setRecvCallback(void* cb)
+void setSerialRecvCallback(void* cb)
 {
 	cb_recv = cb;
 }
@@ -103,13 +103,13 @@ void initConsole(void) {
 	//enable interrupts in the chip, cli(); disables them again
 	sei();
 	
-	_init = 1;
+	_serial_init = 1;
 	return;
 }
 //Wait and retrieve 1 byte
 unsigned char Serial_ReadByte(void)
 {
-	if(_init == 0)
+	if(_serial_init == 0)
 		return 0x00;
 		
 	return usart_GetChar();
@@ -118,7 +118,7 @@ unsigned char Serial_ReadByte(void)
 //Print a single character
 void cprintf_char( unsigned char text )
 {
-	if(_init == 0)
+	if(_serial_init == 0)
 		return;
 
 	usart_SendChar(text);
@@ -127,7 +127,7 @@ void cprintf_char( unsigned char text )
 //Print a full string
 void CPRINTF_STR_NAME(char* str)
 {
-	if(_init == 0)
+	if(_serial_init == 0)
 		return;
 
 	usart_SendString(str);	
@@ -137,7 +137,7 @@ void CPRINTF_STR_NAME(char* str)
 //Print a string
 void cprintf( char *text,... )
 {
-	if(_init == 0)
+	if(_serial_init == 0)
 		return;
 		
 	char *output = text;
