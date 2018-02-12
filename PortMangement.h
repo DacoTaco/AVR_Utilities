@@ -28,7 +28,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #define SetPin(x,y) _setPin(&x,(1<<y))
 #define ClearPin(x,y) _clearPin(&x,(1<<y))
 #define CheckPin(x,y) _checkPin(&x,y)
-#define SetPortMode(x,y,z) _setPortMode(&x,&y,z)
+#define SetPortMode(x,y,z) _setPortMode(&x,&y,z,0xFF)
+#define SetPortModeWithMask(x,y,z,m) _setPortMode(&x,&y,z,m)
 
 #define HIGH 1
 #define LOW 0
@@ -39,4 +40,4 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 void _setPin(volatile uint8_t *port, uint8_t mask);
 void _clearPin(volatile uint8_t *port, uint8_t mask);
 int8_t _checkPin(volatile uint8_t *port , uint8_t Pin);
-void _setPortMode(volatile uint8_t *port_ddr, volatile uint8_t *port, uint8_t mode);
+void _setPortMode(volatile uint8_t *port_ddr, volatile uint8_t *port, uint8_t mode, uint8_t mask);

@@ -36,21 +36,23 @@ int8_t _checkPin(volatile uint8_t *port , uint8_t Pin)
 		return HIGH;
 }
 
-void _setPortMode(volatile uint8_t *port_ddr, volatile uint8_t *port, uint8_t mode)
+void _setPortMode(volatile uint8_t *port_ddr, volatile uint8_t *port, uint8_t mode, uint8_t mask)
 {
 	if(mode == 0)
 	{
-		//set as input;
-		*port_ddr &= ~(0xFF); //0b00000000;
-		//enable pull up resistors
-		*port = 0xFF;
+		//set as input, 0 bit == input
+		//flip all bits in the mask ( 1 becomes 0, 0 becomes 1) and do an AND. this basically ensures 0 stays 0 and all 1's in mask become 0 in DDR
+		*port_ddr &= ~(mask); //0b00000000;
+		//enable pull up resistors, 1 bit = pull up enabled
+		//add all 1's in mask to the port, enabling pull up
+		*port |= mask;
 	}
 	else
 	{
-		//set as output
-		*port_ddr |= (0xFF);//0b11111111;
-		//set output as 0x00
-		*port = 0x00;
+		//set as output, 1 bit = output
+		*port_ddr |= (mask);//0b11111111;
+		//set output as 0x00, 0 bit means normal output state ( 1 = tri-state)
+		*port &= ~(mask);
 	}
 
 }
