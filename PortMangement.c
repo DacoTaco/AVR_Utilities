@@ -38,7 +38,7 @@ int8_t _checkPin(volatile uint8_t *port , uint8_t Pin)
 
 void _setPortMode(volatile uint8_t *port_ddr, volatile uint8_t *port, uint8_t mode, uint8_t mask)
 {
-	if(mode == 0)
+	if(mode == INPUT)
 	{
 		//set as input, 0 bit == input
 		//flip all bits in the mask ( 1 becomes 0, 0 becomes 1) and do an AND. this basically ensures 0 stays 0 and all 1's in mask become 0 in DDR
