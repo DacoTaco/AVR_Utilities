@@ -154,6 +154,7 @@ int8_t _i2c_start(void)
 	
 	//send start signal
 	I2CInfo.mode = started;
+	I2CInfo.error = NULL;
 	TWCR |= (1<<TWSTA); 
 	
 	return 1;
@@ -207,7 +208,7 @@ uint8_t i2c_Read(uint8_t addr,uint8_t repeating)
 	if(I2CInfo.InterruptEnabled == 0)
 	{
 		//TWI is still processing our data...
-		while(ReadData.reading == 1);
+		while(ReadData.reading > 0);
 		//delay or otherwise we can be off before data is read xD
 		_delay_ms(10);
 		
@@ -215,6 +216,10 @@ uint8_t i2c_Read(uint8_t addr,uint8_t repeating)
 		//not needed as we stopped handled that in the ISR
 		//_i2c_stop();
 		
+		if(I2CInfo.error != NULL)
+		{
+			return -1;
+		}
 		return ReadData.data;
 	}
 	else
@@ -280,9 +285,17 @@ ISR(TWI_vect)
 		//--------------------------------------
 		//connection lost and resetting stuff
 		//--------------------------------------
-		case TW_BUS_ERROR:   //0x00
 		case TW_MR_SLA_NACK:   //0x48 SLA+R transmitted , NACK returned
-		case TW_MT_SLA_NACK:   //0x20 SLA+W transmitted , NACK returned		
+		case TW_MT_SLA_NACK:   //0x20 SLA+W transmitted , NACK returned	
+			//we probably addressed something not available. lets indicate it
+			I2CInfo.error = "Error trying to find device!";
+			_i2c_stop();
+			if(I2CInfo.InterruptEnabled == 1 && cb_read != NULL)
+			{
+				cb_read(-1,0);
+			}
+			break;
+		case TW_BUS_ERROR:   //0x00
 		case TW_MT_DATA_NACK:   //0x30 Data transmitted , NACK returned :(		
 		//case TW_MT_ARB_LOST:   //0x38
 		case TW_MR_ARB_LOST:   //0x38 - as master, we lost connection if i understand it correctly xD
@@ -292,7 +305,7 @@ ISR(TWI_vect)
 			_i2c_stop();
 			if(I2CInfo.InterruptEnabled == 1 && cb_read != NULL)
 			{
-				cb_read(-1,0);
+				cb_read(-2,0);
 			}
 			break;
 		
