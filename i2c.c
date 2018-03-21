@@ -14,16 +14,16 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
 
 #include <inttypes.h>
-#include <stdio.h>
-#include <compat/twi.h>
+#include <avr/io.h>
 #include <avr/interrupt.h>
 #include <util/delay.h>
+#include <stdio.h>
+#include <compat/twi.h>
 #include "i2c.h"
 #include "serial.h"
 
 //general defines
 #define ADDR_MASK(x) (x & 0xFE)
-#define MAX_TWI_BUFFER_LENGHT 11
 
 //define CPU frequency here if its not defined in the Makefile
 #ifndef F_CPU
@@ -39,16 +39,19 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #endif
 
 //callbacks
-void (*cb_read)(int8_t,uint8_t) = NULL;
+void (*cb_read)(int8_t,_i2c_Param) = NULL;
 void (*cb_write)(int8_t) = NULL;
-_slaveReadData* (*cb_slave_read)(int8_t) = NULL;
-void (*cb_slave_write)(int8_t,uint8_t) = NULL;
+_i2c_Param* (*cb_slave_read)(int8_t) = NULL;
+void (*cb_slave_write)(int8_t,_i2c_Param) = NULL;
 
 //general Variables
+uint8_t _i2c_init = 0;
 uint8_t dev_addr = 0x00;
-uint8_t TXData[MAX_TWI_BUFFER_LENGHT] = {0};
-uint8_t TX_Size = 0;
-uint8_t TX_Index = 0;
+volatile _i2c_Param response;
+volatile uint8_t response_valid = 0;
+volatile uint8_t TX_Index = 0;
+volatile uint8_t RX_Index = 0;
+
 
 
 //Override the Recv callback, or return it to default by giving NULL
@@ -60,7 +63,7 @@ void setI2cWriteCallback(void* cb)
 {
 	cb_write = cb;
 }
-void setI2cSlaveReadCallback(_slaveReadData* (*cb))
+void setI2cSlaveReadCallback(_i2c_Param* (*cb))
 {
 	cb_slave_read = cb;
 }
@@ -83,11 +86,6 @@ void _initI2c(uint8_t* addr, uint8_t inter_enable)
 		TWAR = ADDR_MASK(*addr);
 	}
 	
-	//set callbacks to null
-	/*setI2cReadCallback(NULL);
-	setI2cWriteCallback(NULL);
-	setI2cSlaveCallback(NULL);*/
-	
 	//disabled untill we make that part
     //set SCL to SCL_CLOCK
     TWSR &= ~((1<<TWPS0) | (1<<TWPS1)); //0x00;
@@ -106,6 +104,9 @@ void _initI2c(uint8_t* addr, uint8_t inter_enable)
 
 	//enable interrupts
 	sei();	
+	
+	_i2c_init = 1;
+	return;
 }
 
 void i2c_Init(void)
@@ -117,8 +118,61 @@ void i2c_Init_addr(uint8_t addr,uint8_t inter_enable)
 	_initI2c(&addr,inter_enable);
 }
 
+
+//FUCKING VOLTILE'S WONT WORK WITH MEMCPY/MEMSET FML!!
+void CopyResponseToParam(_i2c_Param* param)
+{
+	if(param == NULL)
+		return;
+	
+	for(uint8_t i=0;i<MAX_TWI_BUFFER_LENGHT;i++)
+	{
+		param->ReadData[i] = response.ReadData[i];
+		param->WriteData[i] = response.WriteData[i];
+	}
+	param->ReadData_Size = response.ReadData_Size;
+	param->WriteData_Size = response.WriteData_Size;
+	param->ret = response.ret;
+}
+void CopyParamToResponse(_i2c_Param* param)
+{
+	if(param == NULL)
+		return;
+	
+	for(uint8_t i=0;i<MAX_TWI_BUFFER_LENGHT;i++)
+	{
+		response.ReadData[i] = param->ReadData[i];
+		response.WriteData[i] = param->WriteData[i];
+	}
+	response.ReadData_Size = param->ReadData_Size;
+	response.WriteData_Size = param->WriteData_Size;
+	response.ret = param->ret;
+}
+
+void ClearResponse(void)
+{
+	for(uint8_t i=0;i<MAX_TWI_BUFFER_LENGHT;i++)
+	{
+		response.ReadData[i] = 0;
+		response.WriteData[i] = 0;
+	}
+	response.ReadData_Size = 0;
+	response.WriteData_Size = 0;
+	response.ret = 0;
+}
+
+void resetVariables(void)
+{
+	dev_addr = 0;
+	response_valid = 0;
+	ClearResponse();
+	TX_Index = 0;
+	RX_Index = 0;
+}
+
 int8_t _i2c_stop(void)
 {
+
 	//send stop signal
 	TWCR |= ((1<<TWSTO) | (1<<TWINT) | (1<<TWEA));
 	//stop start signal
@@ -127,17 +181,15 @@ int8_t _i2c_stop(void)
 	//wait for bus to be released
 	while(TWCR & (1<<TWSTO));
 	
+	//lets not reset the variables as it clears our response & therefor the output xD
+	//resetVariables();
 	I2CInfo.mode = ready;
-	dev_addr = 0;
-	ReadData.reading = 0;
-	TXData[0] = 0x00;
-	TX_Size = 0;
-	TX_Index = 0;
+	response_valid = 0;
 	
 	return 1;
 }
 
-uint8_t _i2c_write(uint8_t data)
+int8_t _i2c_write(uint8_t data)
 {
 	TWDR = data;
 	return 1;
@@ -159,18 +211,39 @@ int8_t _i2c_start(void)
 	
 	return 1;
 }
-
-
-uint8_t i2c_Write(uint8_t addr,uint8_t data)
+int8_t _i2c_write_next(void)
 {
+	if(response_valid == 0 || TX_Index >= response.WriteData_Size || TX_Index >= MAX_TWI_BUFFER_LENGHT)
+		return -1;
+	
+	_i2c_write(response.WriteData[TX_Index]);
+	TX_Index++;
+	
+	return 1;
+}
+
+uint8_t i2c_Write(uint8_t addr,_i2c_Param data)
+{
+	if(_i2c_init == 0)
+		return -1;
+	
+	if(data.ReadData_Size > MAX_TWI_BUFFER_LENGHT || data.WriteData_Size > MAX_TWI_BUFFER_LENGHT)
+	{
+		return -2;
+	}
+	
 	//wait untill hardware is ready
 	while(I2CInfo.mode != ready);
 	
 	//prepare the data for the device
+	resetVariables();
 	dev_addr = (ADDR_MASK(addr) + I2C_WRITE);
-	TXData[0] = data;
-	TX_Size = 1;
-	TX_Index = 0;
+		
+	if(I2CInfo.InterruptEnabled == 0)
+	{
+		CopyParamToResponse(&data);
+	}
+	response_valid = 1;
 	
 	
 	//send start. this will trigger all the interrupts!
@@ -179,8 +252,7 @@ uint8_t i2c_Write(uint8_t addr,uint8_t data)
 	if(I2CInfo.InterruptEnabled == 0)
 	{
 		//while untill all data is send
-		//TODO : fix this while, its stuck in loop
-		while(TX_Size != 0);
+		while(response_valid != 0);
 		//delay or otherwise we can be off before fully done xD
 		_delay_ms(10);
 		
@@ -194,13 +266,35 @@ uint8_t i2c_Write(uint8_t addr,uint8_t data)
 	return 1;
 }
 
-uint8_t i2c_Read(uint8_t addr,uint8_t repeating)
+_i2c_Param i2c_Read(uint8_t addr,_i2c_Param param)
 {	
+	_i2c_Param retData = param;
+	
+	if(_i2c_init == 0)
+	{
+		retData.ret = -1;
+		return retData;
+	}
+	
+	if(retData.ReadData_Size > MAX_TWI_BUFFER_LENGHT || retData.WriteData_Size > MAX_TWI_BUFFER_LENGHT)
+	{
+		retData.ret = -2;
+		return retData;
+	}
+	
 	//wait untill hardware is ready
 	while(I2CInfo.mode != ready);
 	
-	//prepare the address of the device
+	//prepare the address of the device & ret
+	resetVariables();
 	dev_addr = (ADDR_MASK(addr) + I2C_READ);
+	
+	if(I2CInfo.InterruptEnabled == 0)
+	{
+		CopyParamToResponse(&retData);
+	}
+	response_valid = 1;
+	
 	
 	//send start. this will trigger all the interrupts!
 	_i2c_start();
@@ -208,9 +302,12 @@ uint8_t i2c_Read(uint8_t addr,uint8_t repeating)
 	if(I2CInfo.InterruptEnabled == 0)
 	{
 		//TWI is still processing our data...
-		while(ReadData.reading > 0);
+		while(response_valid != 0);
 		//delay or otherwise we can be off before data is read xD
 		_delay_ms(10);
+		
+		//copy over data from response
+		CopyResponseToParam(&retData);
 		
 		//clear signals, or send repeating start for more data
 		//not needed as we stopped handled that in the ISR
@@ -218,16 +315,17 @@ uint8_t i2c_Read(uint8_t addr,uint8_t repeating)
 		
 		if(I2CInfo.error != NULL)
 		{
-			return -1;
+			retData.ret = -3;
+			return retData;
 		}
-		return ReadData.data;
+		return retData;
 	}
 	else
 	{
 		//if we are playing with interrupts, it'll fire when read is done or an error occured
-		return 1;
+		return retData;
 	}
-	return 1;
+	return retData;
 }
 
 
@@ -275,7 +373,7 @@ uint8_t* GetErrorMsg(void)
 ISR(TWI_vect)
 {	
 	uint8_t status = i2c_GetStatus();
-	//cprintf("status : '0x%02X'\n\r",status);
+	cprintf("status : '0x%02X'\n\r",status);
 	
 	//OK, so. TWI.
 	//for master mode, if a read bit was set we are running in MR mode, otherwise MT mode
@@ -292,7 +390,7 @@ ISR(TWI_vect)
 			_i2c_stop();
 			if(I2CInfo.InterruptEnabled == 1 && cb_read != NULL)
 			{
-				cb_read(-1,0);
+				cb_read(-1,response);
 			}
 			break;
 		case TW_BUS_ERROR:   //0x00
@@ -305,7 +403,7 @@ ISR(TWI_vect)
 			_i2c_stop();
 			if(I2CInfo.InterruptEnabled == 1 && cb_read != NULL)
 			{
-				cb_read(-2,0);
+				cb_read(-1,response);
 			}
 			break;
 		
@@ -324,18 +422,15 @@ ISR(TWI_vect)
 			break;
 		case TW_MT_SLA_ACK:   //0x18 - SLA+W transmitted, we received ACK. device ready for data		
 		case TW_MT_DATA_ACK:   //0x28 - Data send and ACK received. if we have more data, send that shit!
-			//if we have MORE data to write, go to next case, else : break!
-			if(TX_Index >= TX_Size)
+			if(TX_Index >= response.WriteData_Size)
 			{
-				TX_Index = 0;
-				TX_Size = 0;		
 				_i2c_stop();
 			}
 			else
 			{
 				//write data
-				//cprintf("writing 0x%02X\n\r",TXData[TX_Index]);
-				_i2c_write(TXData[TX_Index]);
+				//cprintf("writing 0x%02X\n\r",response.WriteData[TX_Index]);
+				_i2c_write(response.WriteData[TX_Index]);
 				//clear any start and stop and lets write!
 				TWCR &= ~((1<<TWSTA) | (1<<TWSTO) | (1<<TWEA)); 
 				TWCR |= (1<<TWINT);
@@ -350,8 +445,6 @@ ISR(TWI_vect)
 		case TW_MR_SLA_ACK:   //0x40
 			//we send the addr, and device is ready for reading!
 			//clear any start and stop signals and lets read!
-			if(I2CInfo.InterruptEnabled == 0)
-				ReadData.reading = 1;
 			TWCR &= ~((1<<TWSTA) | (1<<TWSTO)); 
 			
 			//set bit so we send ACK after reading
@@ -361,51 +454,91 @@ ISR(TWI_vect)
 		case TW_MR_DATA_ACK:   //0x50
 			//we received data from the slave, and an ACK!
 			//read data from TWDR!
-			//cprintf("data read!\n\r");	
-			ReadData.data = _i2c_read();
-			if(I2CInfo.InterruptEnabled == 0)
+			if(RX_Index < response.ReadData_Size)
 			{
-				ReadData.reading = 0;
+				//uint8_t byte = _i2c_read();
+				//cprintf("read byte : [0x%02X] = 0x%02X\n\r",RX_Index,byte);
+				response.ReadData[RX_Index] = _i2c_read();
+				RX_Index++;
 			}
-			else if(cb_read != NULL)
+			else
 			{
-				cb_read(1,ReadData.data);
+				response_valid = 0;
+			}
+
+			if(cb_read != NULL)
+			{
+				//TODO : only fire callback when all data is received
+				//HOW DO WE EVEN KNOW WHEN ALL IS RECEIVED XD
+				cb_read(1,response);
 			}
 			
-			//TODO : if we want more(repeating start), implement this here
-			_i2c_stop();
+			//TODO : if we want repeating start, implement this here
+			if(RX_Index >= response.ReadData_Size)
+			{
+				_i2c_stop();
+			}
+			else
+			{
+				TWCR |= ((1<<TWEA) | (1<<TWINT));
+			}
 			break;		
 
 			
 		//--------------------------------------
 		//Slave cases - Sending Data
 		//--------------------------------------
+		case TW_ST_DATA_ACK:   //0xB8 - we have more data to send. send and if we have done all send NACK, else ACK
 		case TW_ST_SLA_ACK:   //0xA8
 			//we received our addr and send ack, time to send data!
-			//retrieve data from cb, and get data. else, dont respond.
-			if(cb_slave_read != NULL)
+			//retrieve data from cb, and get data. else, dont respond.	
+			if(response_valid <= 0)
 			{
-				_slaveReadData* data = cb_slave_read(status);
-				
-				if(data != NULL && data->ArraySize > 0 && data->data != NULL)
-				{
-					//send response!
-					_i2c_write(data->data[0]);
+				//response is null, lets see if we can get a response first...
+				if(cb_slave_read != NULL)
+				{	
+					_i2c_Param* ret = cb_slave_read(status);
 					
-					//clear stop signal and send!
-					TWCR &= ~((1<<TWSTO) | (1<<TWEA));
-					TWCR |= (1<<TWINT);
+					if(ret != NULL && ret->WriteData_Size > 0 && ret->WriteData != NULL)
+					{
+						CopyParamToResponse(ret);
+						response_valid = 1;
+					}
+				}
+				
+				if(response_valid <= 0)
+				{
+					//no data was prepped. lets bail
+					resetVariables();
+					_i2c_write(0xFF);
 				}
 			}
-			break;
-		case TW_ST_ARB_LOST_SLA_ACK:   //0xB0
-			//arbitration as master lost, own slave addr received + ACK. datasheet said to act like just sending data
-		case TW_ST_DATA_ACK:   //0xB8
-			//_i2c_write(data)
-			TWCR |= ((1<<TWEA) | (1<<TWINT));
+			
+			if(response_valid > 0 && TX_Index <= MAX_TWI_BUFFER_LENGHT)
+			{
+				//we have some data to send. lets go!
+				_i2c_write_next();	
+			}
+			
+			
+			//set up the response!
+			if(response_valid <= 0 || TX_Index >= response.WriteData_Size)
+			{
+				resetVariables();
+				TWCR &= ~((1<<TWSTO) | (1<<TWEA));
+				TWCR |= (1<<TWINT);
+				
+			}
+			else
+			{
+				//we have more data to send. response correctly!
+				TWCR |= ((1<<TWEA) | (1<<TWINT));
+			}	
 			break;
 		case TW_ST_DATA_NACK:   //0xC0
 			break;
+		case TW_ST_ARB_LOST_SLA_ACK:   //0xB0
+			//arbitration as master lost, own slave addr received + ACK. datasheet said to act like just sending data
 		case TW_ST_LAST_DATA:   //0xC8
 			//all data send. lets re-enter slave mode 
 			TWCR |= ((1<<TWEA) | (1<<TWINT));
@@ -427,19 +560,23 @@ ISR(TWI_vect)
 		case TW_SR_DATA_NACK:   //0x88 
 		case TW_SR_GCALL_DATA_ACK:   //0x90
 		case TW_SR_DATA_ACK:   //0x80 - data has been received, ACK has been send as response
-			if(cb_slave_write != NULL)
+		
+			//TODO : only fire callback when all data is received
+			if(cb_slave_write != NULL && RX_Index < MAX_TWI_BUFFER_LENGHT)
 			{
-				uint8_t data = _i2c_read();
-				cb_slave_write(status,data);
+				response.ReadData[RX_Index] = _i2c_read();
+				RX_Index++;
+				cb_slave_write(status,response);
 			}
 			TWCR &= ~(1<<TWSTO);
-			TWCR |= (1<<TWINT);
+			//TWCR |= (1<<TWINT);
 			//send ACK reply if we want more data
-			//TWCR |= ((1<<TWEA) | (1<<TWINT));
+			TWCR |= ((1<<TWEA) | (1<<TWINT));
 			break; 
 		case TW_SR_STOP:   //0xA0 - we received a stop signal. release bus and listen again
 			//go back to listening for a call
 			TWCR |= ((1<<TWEA) | (1<<TWINT));
+			resetVariables();
 			//_i2c_stop();
 			break;
 		

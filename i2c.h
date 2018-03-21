@@ -17,6 +17,9 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #define I2C_READ    TW_READ
 #define I2C_WRITE   TW_WRITE
 
+//general defines
+#define MAX_TWI_BUFFER_LENGHT 0x0A
+
 #ifdef SAVE_SPACE
 #define _FORCE_INTERRUPT_MODE_
 #endif
@@ -40,27 +43,28 @@ typedef enum {
 	}_I2CInfo;
 _I2CInfo I2CInfo;
 
-typedef struct _readData{
-	int8_t reading;
-	uint8_t data;
-}_readData;
-
-typedef struct _slaveReadData{
-	int8_t ArraySize;
-	uint8_t* data;
-}_slaveReadData;
-
-_readData ReadData;
+typedef struct _i2c_Param{
+	volatile uint8_t ReadData[MAX_TWI_BUFFER_LENGHT];
+	uint8_t ReadData_Size;
+	volatile uint8_t WriteData[MAX_TWI_BUFFER_LENGHT];
+	uint8_t WriteData_Size;	
+	uint8_t ret;
+}_i2c_Param;
 
 
 //---------------------------------
 //		- Base Functions -
 //---------------------------------
+
+//setup i2c, dont set an address of our device and setup functions as SYNC
 void i2c_Init(void);
+//setup i2c, set the device as the given address and setup functions as ASYNC
 void i2c_Init_addr(uint8_t addr,uint8_t inter_enable);
+
+//set the callbacks for the ASYNC i2c functions. these will be called back with the result
 void setI2cReadCallback(void* cb);
 void setI2cWriteCallback(void* cb);
-void setI2cSlaveReadCallback(_slaveReadData* (*cb));
+void setI2cSlaveReadCallback(_i2c_Param* (*cb));
 void setI2cSlaveWriteCallback(void* cb);
 
 uint8_t i2c_GetStatus(void);
@@ -70,8 +74,8 @@ uint8_t* GetErrorMsg(void);
 //---------------------------------
 //		- Master Functions -
 //---------------------------------
-uint8_t i2c_Read(uint8_t dev_addr,uint8_t repeating);
-uint8_t i2c_Write(uint8_t addr,uint8_t data);
+_i2c_Param i2c_Read(uint8_t addr,_i2c_Param param);
+uint8_t i2c_Write(uint8_t addr,_i2c_Param data);
 
 //---------------------------------
 //		- Master Functions -
