@@ -40,7 +40,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 //callbacks
 void (*cb_read)(int8_t,_i2c_Param) = NULL;
-void (*cb_write)(int8_t) = NULL;
 _i2c_Param* (*cb_slave_read)(int8_t) = NULL;
 void (*cb_slave_write)(int8_t,_i2c_Param) = NULL;
 
@@ -58,10 +57,6 @@ volatile uint8_t RX_Index = 0;
 void setI2cReadCallback(void* cb)
 {
 	cb_read = cb;
-}
-void setI2cWriteCallback(void* cb)
-{
-	cb_write = cb;
 }
 void setI2cSlaveReadCallback(_i2c_Param* (*cb))
 {
@@ -222,6 +217,7 @@ int8_t _i2c_write_next(void)
 	return 1;
 }
 
+//TODO : rewrite write AND the callbacks. be done with the param stuff (except internally)
 uint8_t i2c_Write(uint8_t addr,_i2c_Param data)
 {
 	if(_i2c_init == 0)
@@ -266,20 +262,16 @@ uint8_t i2c_Write(uint8_t addr,_i2c_Param data)
 	return 1;
 }
 
-_i2c_Param i2c_Read(uint8_t addr,_i2c_Param param)
-{	
-	_i2c_Param retData = param;
-	
+int8_t i2c_read(uint8_t addr,uint16_t* read_data,uint8_t size)
+{
 	if(_i2c_init == 0)
 	{
-		retData.ret = -1;
-		return retData;
+		return -1;
 	}
 	
-	if(retData.ReadData_Size > MAX_TWI_BUFFER_LENGHT || retData.WriteData_Size > MAX_TWI_BUFFER_LENGHT)
+	if(read_data == NULL || size > MAX_TWI_BUFFER_LENGHT || size == 0)
 	{
-		retData.ret = -2;
-		return retData;
+		return -103;
 	}
 	
 	//wait untill hardware is ready
@@ -289,12 +281,8 @@ _i2c_Param i2c_Read(uint8_t addr,_i2c_Param param)
 	resetVariables();
 	dev_addr = (ADDR_MASK(addr) + I2C_READ);
 	
-	if(I2CInfo.InterruptEnabled == 0)
-	{
-		CopyParamToResponse(&retData);
-	}
+	response.ReadData_Size = size;
 	response_valid = 1;
-	
 	
 	//send start. this will trigger all the interrupts!
 	_i2c_start();
@@ -307,25 +295,39 @@ _i2c_Param i2c_Read(uint8_t addr,_i2c_Param param)
 		_delay_ms(10);
 		
 		//copy over data from response
-		CopyResponseToParam(&retData);
-		
+		*read_data = (response.ReadData[0] << 8) + response.ReadData[1];
+				
 		//clear signals, or send repeating start for more data
 		//not needed as we stopped handled that in the ISR
 		//_i2c_stop();
 		
-		if(I2CInfo.error != NULL)
+		/*if(I2CInfo.error != NULL || response.ret <= 0)
 		{
-			retData.ret = -3;
-			return retData;
-		}
-		return retData;
+			return response.ret;
+		}*/
+		return response.ret;
 	}
 	else
 	{
 		//if we are playing with interrupts, it'll fire when read is done or an error occured
-		return retData;
+		return 1;
 	}
-	return retData;
+	return 1;
+}
+int8_t i2c_Read8(uint8_t addr,uint8_t* read_data)
+{
+	uint16_t data;
+	if(read_data == NULL)
+		return -103;
+	
+	int8_t ret;
+	ret = i2c_read(addr,&data,1);
+	*read_data = (data & 0xFF00) >> 8;
+	return ret;
+}
+int8_t i2c_Read16(uint8_t addr,uint16_t* read_data)
+{	
+	return i2c_read(addr,read_data,2);
 }
 
 
@@ -466,7 +468,10 @@ ISR(TWI_vect)
 				response_valid = 0;
 			}
 
-			if(cb_read != NULL)
+			if(
+				cb_read != NULL && 
+				(RX_Index >= MAX_TWI_BUFFER_LENGHT || RX_Index >= response.ReadData_Size)
+			)
 			{
 				//TODO : only fire callback when all data is received
 				//HOW DO WE EVEN KNOW WHEN ALL IS RECEIVED XD

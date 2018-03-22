@@ -74,7 +74,9 @@ uint8_t* GetErrorMsg(void);
 //---------------------------------
 //		- Master Functions -
 //---------------------------------
-_i2c_Param i2c_Read(uint8_t addr,_i2c_Param param);
+int8_t i2c_Read8(uint8_t addr,uint8_t* read_data);
+int8_t i2c_Read16(uint8_t addr,uint16_t* read_data);
+
 uint8_t i2c_Write(uint8_t addr,_i2c_Param data);
 
 //---------------------------------
