@@ -18,7 +18,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #define I2C_WRITE   TW_WRITE
 
 //general defines
-#define MAX_TWI_BUFFER_LENGHT 0x0A
+#define MAX_TWI_BUFFER_LENGHT 0x04
 
 #ifdef SAVE_SPACE
 #define _FORCE_INTERRUPT_MODE_
@@ -36,13 +36,7 @@ typedef enum {
 	slaveReciever
 	} I2CMode;
 	
- typedef struct _I2CInfo{
-	I2CMode mode;
-	uint8_t InterruptEnabled;
-	char* error; //change into char array?
-	}_I2CInfo;
-_I2CInfo I2CInfo;
-
+//typedef!
 typedef struct _i2c_Param{
 	volatile uint8_t ReadData[MAX_TWI_BUFFER_LENGHT];
 	uint8_t ReadData_Size;
@@ -50,6 +44,13 @@ typedef struct _i2c_Param{
 	uint8_t WriteData_Size;	
 	uint8_t ret;
 }_i2c_Param;
+	
+ typedef struct _I2CInfo{
+	I2CMode mode;
+	uint8_t InterruptEnabled;
+	char* error; //change into char array?
+	}_I2CInfo;
+_I2CInfo I2CInfo;
 
 
 //---------------------------------
@@ -76,8 +77,8 @@ uint8_t* GetErrorMsg(void);
 //---------------------------------
 int8_t i2c_Read8(uint8_t addr,uint8_t* read_data);
 int8_t i2c_Read16(uint8_t addr,uint16_t* read_data);
-
-uint8_t i2c_Write(uint8_t addr,_i2c_Param data);
+int8_t i2c_Write8(uint8_t addr,uint8_t write_data);
+int8_t i2c_Write16(uint8_t addr,uint16_t write_data);
 
 //---------------------------------
 //		- Master Functions -
