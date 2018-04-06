@@ -14,7 +14,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
 
 //bit used for marking the command read or write
-#define I2C_READ    TW_READ
+//TW_READ = 1 , Write = 0
+#define I2C_READ    TW_READ 
 #define I2C_WRITE   TW_WRITE
 
 //general defines
@@ -30,6 +31,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 typedef enum {
 	ready,
 	started,
+	data_ready,
+	exiting,
 	masterTransmitter,
 	masterReceiver,
 	slaceTransmitter,
@@ -42,7 +45,7 @@ typedef struct _i2c_Param{
 	uint8_t ReadData_Size;
 	volatile uint8_t WriteData[MAX_TWI_BUFFER_LENGHT];
 	uint8_t WriteData_Size;	
-	uint8_t ret;
+	volatile int8_t ret;
 }_i2c_Param;
 	
  typedef struct _I2CInfo{

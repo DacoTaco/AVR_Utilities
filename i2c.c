@@ -40,6 +40,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 //callbacks
 void (*cb_read)(int8_t,uint8_t byte) = NULL;
+//redo cb to remove the requirement for the Param. also split Param?
 _i2c_Param* (*cb_slave_read)(int8_t) = NULL;
 void (*cb_slave_write)(int8_t,uint8_t byte) = NULL;
 
@@ -153,9 +154,8 @@ void resetVariables(void)
 
 int8_t _i2c_stop(void)
 {
-
 	//send stop signal
-	TWCR |= ((1<<TWSTO) | (1<<TWINT) | (1<<TWEA));
+	TWCR |= ((1<<TWEN) | (1<<TWSTO) | (1<<TWINT) | (1<<TWEA) );
 	//stop start signal
     TWCR &= ~(1<<TWSTA); 
 	
@@ -188,7 +188,7 @@ int8_t _i2c_start(void)
 	//send start signal
 	I2CInfo.mode = started;
 	I2CInfo.error = NULL;
-	TWCR |= (1<<TWSTA); 
+	TWCR |= ((1<<TWSTA) | (1<<TWINT) | (1<<TWEA)); 
 	
 	return 1;
 }
@@ -214,7 +214,7 @@ int8_t i2c_write(uint8_t addr,uint16_t write_data,uint8_t size)
 	
 	if(size > MAX_TWI_BUFFER_LENGHT || size == 0)
 	{
-		return -103;
+		return -102;
 	}
 	
 	//wait untill hardware is ready
@@ -270,7 +270,7 @@ int8_t i2c_read(uint8_t addr,uint16_t* read_data,uint8_t size)
 	
 	if(read_data == NULL || size > MAX_TWI_BUFFER_LENGHT || size == 0)
 	{
-		return -103;
+		return -102;
 	}
 	
 	//wait untill hardware is ready
@@ -316,7 +316,7 @@ int8_t i2c_read(uint8_t addr,uint16_t* read_data,uint8_t size)
 int8_t i2c_Read8(uint8_t addr,uint8_t* read_data)
 {
 	if(read_data == NULL)
-		return -103;
+		return -102;
 	
 	uint16_t data;
 	int8_t ret;
@@ -388,6 +388,7 @@ ISR(TWI_vect)
 		case TW_MT_SLA_NACK:   //0x20 SLA+W transmitted , NACK returned	
 			//we probably addressed something not available. lets indicate it
 			I2CInfo.error = "Error trying to find device!";
+			response.ret = -106;
 			_i2c_stop();
 			if(I2CInfo.InterruptEnabled == 1 && cb_read != NULL)
 			{
@@ -411,7 +412,7 @@ ISR(TWI_vect)
 		
 		//--------------------------------------
 		//master cases - transmitting data
-		//--------------------------------------					
+		//--------------------------------------		
 		case TW_REP_START:   //0x10 - a repeated start has been transmitted
 			//we have been successful in sending start and gaining control.
 		case TW_START:   //0x08 - A start condition has been transmitted. send address of device we want to talk to
@@ -419,24 +420,40 @@ ISR(TWI_vect)
 			_i2c_write(dev_addr);
 			//clear the start signal
 			TWCR &= ~((1<<TWSTA)); // clear TWSTA
-			TWCR |= (1<<TWINT);
+			TWCR |= ((1<<TWINT) | (1<<TWEA));
 			break;
+		
 		case TW_MT_SLA_ACK:   //0x18 - SLA+W transmitted, we received ACK. device ready for data		
 		case TW_MT_DATA_ACK:   //0x28 - Data send and ACK received. if we have more data, send that shit!
-			if(TX_Index >= response.WriteData_Size)
+			if(TX_Index < response.WriteData_Size && I2CInfo.mode != exiting)
 			{
-				_i2c_stop();
+				//send data and ACK
+				_i2c_write_next();
+				response.ret = TX_Index;
+				
 			}
 			else
 			{
-				//write data
-				//_i2c_write(response.WriteData[TX_Index]);
-				//TX_Index++;
-				_i2c_write_next();
-				//clear any start and stop and lets write!
-				TWCR &= ~((1<<TWSTA) | (1<<TWSTO) | (1<<TWEA)); 
+				I2CInfo.mode = exiting;
+			}
+			
+			if(TX_Index > response.WriteData_Size || I2CInfo.mode == exiting)
+			{
+				//TODO : place repeating start here
+				_i2c_stop();
+			}
+			else if(TX_Index < response.WriteData_Size)
+			{
+				//clear start and stop bits just in case, and send ACK!
+				//TWCR &= ~((1<<TWSTA) | (1<<TWSTO)); 
+				TWCR |= ((1<<TWINT) | (1<<TWEA));
+			}
+			else //if(TX_Index == response.WriteData_Size)
+			{
+				TWCR &= ~(1<<TWEA);
 				TWCR |= (1<<TWINT);
-			}			
+			}
+		
 			break;
 	
 	
@@ -451,40 +468,49 @@ ISR(TWI_vect)
 			//set bit so we send ACK after reading
 			TWCR |= ((1<<TWEA) | (1<<TWINT));
 			break;
-		case TW_MR_DATA_NACK:   //0x58 Data Received, NACK afterwards :(
-		case TW_MR_DATA_ACK:   //0x50
-			//we received data from the slave, and an ACK!
+		case TW_MR_DATA_NACK:   //0x58 Data Received, NACK afterwards :( , probably signal to just kill
+			I2CInfo.mode = exiting;
+		case TW_MR_DATA_ACK:   //0x50 we received data from the slave, and an ACK!
 			//read data from TWDR!
-			if(RX_Index < response.ReadData_Size)
+			if(RX_Index < response.ReadData_Size && I2CInfo.mode != exiting)
 			{
 				//uint8_t byte = _i2c_read();
 				response.ReadData[RX_Index] = _i2c_read();
+				//cprintf("read 0x%02X\n\r",response.ReadData[RX_Index]);
 				RX_Index++;
 			}
 			else
 			{
-				response_valid = 0;
+				I2CInfo.mode = exiting;
 			}
 
 			if(
 				cb_read != NULL && 
 				(RX_Index >= MAX_TWI_BUFFER_LENGHT || RX_Index >= response.ReadData_Size) &&
-				response_valid > 0
+				I2CInfo.mode != exiting
 			)
 			{
 				//TODO : only fire callback when all data is received
 				//HOW DO WE EVEN KNOW WHEN ALL IS RECEIVED XD
+				//move to the right else under this code
 				cb_read(1,response.ReadData[RX_Index-1]);
 			}
 			
-			//TODO : if we want repeating start, implement this here
-			if(RX_Index >= response.ReadData_Size)
+			if(RX_Index > response.ReadData_Size || I2CInfo.mode == exiting)
 			{
+				//TODO : implement repeating task here
 				_i2c_stop();
 			}
-			else
+			else if(RX_Index < response.ReadData_Size)
 			{
+				//we are expecting more data. so time to send ACK and get more!
 				TWCR |= ((1<<TWEA) | (1<<TWINT));
+			} 
+			else //if(RX_Index == response.ReadData_Size)
+			{
+				//we read everything, send NACK and in our next loop stop
+				TWCR &= ~(1<<TWEA);
+				TWCR |= (1<<TWINT);
 			}
 			break;		
 
