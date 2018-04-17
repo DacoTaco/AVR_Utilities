@@ -19,10 +19,11 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #define I2C_WRITE   TW_WRITE
 
 //general defines
-#define MAX_TWI_BUFFER_LENGHT 0x04
+#define MAX_TWI_BUFFER_LENGHT 0x02
 
 #ifdef SAVE_SPACE
 #define _FORCE_INTERRUPT_MODE_
+#define _MASTER_ONLY_
 #endif
 
 #include <inttypes.h>
@@ -31,27 +32,13 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 typedef enum {
 	ready,
 	started,
-	data_ready,
 	exiting,
-	masterTransmitter,
-	masterReceiver,
-	slaceTransmitter,
-	slaveReciever
 	} I2CMode;
 	
-//typedef!
-typedef struct _i2c_Param{
-	volatile uint8_t ReadData[MAX_TWI_BUFFER_LENGHT];
-	uint8_t ReadData_Size;
-	volatile uint8_t WriteData[MAX_TWI_BUFFER_LENGHT];
-	uint8_t WriteData_Size;	
-	volatile int8_t ret;
-}_i2c_Param;
-	
+//typedef!	
  typedef struct _I2CInfo{
 	I2CMode mode;
 	uint8_t InterruptEnabled;
-	char* error; //change into char array?
 	}_I2CInfo;
 _I2CInfo I2CInfo;
 
@@ -68,7 +55,7 @@ void i2c_Init_addr(uint8_t addr,uint8_t inter_enable);
 //set the callbacks for the ASYNC i2c functions. these will be called back with the result
 void setI2cReadCallback(void* cb);
 void setI2cWriteCallback(void* cb);
-void setI2cSlaveReadCallback(_i2c_Param* (*cb));
+void setI2cSlaveReadCallback(int8_t* (*cb));
 void setI2cSlaveWriteCallback(void* cb);
 
 uint8_t i2c_GetStatus(void);
@@ -84,6 +71,6 @@ int8_t i2c_Write8(uint8_t addr,uint8_t write_data);
 int8_t i2c_Write16(uint8_t addr,uint16_t write_data);
 
 //---------------------------------
-//		- Master Functions -
+//		- Slave Functions -
 //---------------------------------
 //slave is completely interrupt based. set the slave callback if you want to get in on the action :P
