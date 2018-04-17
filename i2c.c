@@ -35,7 +35,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 /*formula according to the ATMega8 documentation : 
 	freq = F_CPU/ ( 16 + 2(TWBR)*(Prescaler) */
 #ifndef SCL_CLOCK
-#define SCL_CLOCK  400000L
+#define SCL_CLOCK  400
 #endif
 
 //callbacks
@@ -82,10 +82,24 @@ void _initI2c(uint8_t* addr, uint8_t inter_enable)
 		TWAR = ADDR_MASK(*addr);
 	}
 	
-	//disabled untill we make that part
     //set SCL to SCL_CLOCK
-    TWSR &= ~((1<<TWPS0) | (1<<TWPS1)); //0x00;
-    TWBR = ((F_CPU/SCL_CLOCK)-16)/2;
+    /*TWSR &= ~((1<<TWPS0) | (1<<TWPS1)); //0x00;
+    TWBR = ((F_CPU/SCL_CLOCK)-16)/2;*/
+	
+	// set i2c bitrate
+	// SCL freq = F_CPU/(16+2*TWBR))
+	#ifdef TWPS0
+		// for processors with additional bitrate division (mega128)
+		// SCL freq = F_CPU/(16+2*TWBR*4^TWPS)
+		// set TWPS to zero
+		TWSR &= ~(1<<TWPS0); 
+		TWSR &= ~(1<<TWPS1); 
+	#endif
+	// calculate bitrate division	
+	uint8_t bitrate_div = ((F_CPU/1000l)/SCL_CLOCK);
+	if(bitrate_div >= 16)
+		bitrate_div = (bitrate_div-16)/2;
+	TWBR = bitrate_div;
 	
 	//TWCR |= (1<<TWEA) | (1<<TWEN) | (1<<TWIE); 
 	uint8_t mask = 	(1<<TWEN) | //enable TWI
@@ -225,8 +239,9 @@ int8_t i2c_write(uint8_t addr,uint16_t write_data,uint8_t size)
 	dev_addr = (ADDR_MASK(addr) + I2C_WRITE);
 	
 	response.WriteData_Size = size;
-	response.WriteData[0] = (write_data & 0x00FF);
-	response.WriteData[1] = (write_data & 0xFF00) >> 8;
+	response.WriteData[0] = (write_data & 0xFF00) >> 8;
+	response.WriteData[1] = (write_data & 0x00FF);
+	
 	response_valid = 1;
 	
 	//send start. this will trigger all the interrupts!
@@ -251,7 +266,7 @@ int8_t i2c_write(uint8_t addr,uint16_t write_data,uint8_t size)
 
 int8_t i2c_Write8(uint8_t addr,uint8_t write_data)
 {
-	uint16_t data = write_data;
+	uint16_t data = write_data << 8;
 	int8_t ret;
 	ret = i2c_write(addr,data,1);
 	return ret;
@@ -374,7 +389,7 @@ uint8_t* GetErrorMsg(void)
 ISR(TWI_vect)
 {	
 	uint8_t status = i2c_GetStatus();
-	cprintf("status : '0x%02X'\n\r",status);
+	//cprintf("status : '0x%02X'\n\r",status);
 	
 	//OK, so. TWI.
 	//for master mode, if a read bit was set we are running in MR mode, otherwise MT mode
