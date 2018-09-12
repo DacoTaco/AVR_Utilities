@@ -26,8 +26,19 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #define CPRINTF_STR_NAME cprintf
 #endif
 
+#ifdef DEBUG
+	#define cprintf_debug(x) cprintf(x)
+	#define cprintf_debug_char(x) cprintf_char(x)
+#else
+	#define cprintf_debug(x) {}
+	#define cprintf_debug_char(x) {}
+#endif
+
 void initConsole(void);
 void setSerialRecvCallback(void* cb);
+void DisableSerialInterrupt(void);
+void EnableSerialInterrupt(void);
+
 unsigned char Serial_ReadByte(void);
 void cprintf_char( unsigned char text );
 

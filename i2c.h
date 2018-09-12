@@ -22,7 +22,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #define MAX_TWI_BUFFER_LENGHT 0x02
 
 #ifdef SAVE_SPACE
-#define _FORCE_INTERRUPT_MODE_
+//#define _FORCE_INTERRUPT_MODE_
 #define _MASTER_ONLY_
 #endif
 

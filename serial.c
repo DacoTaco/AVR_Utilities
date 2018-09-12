@@ -83,8 +83,27 @@ unsigned char usart_GetChar(void) {
     while ( !(UCSRA & (_BV(RXC))) );
     // Return the data
     return UDR;
-}       
-
+}    
+void SetSerialInterrupt(int8_t enable)
+{
+	if(enable > 0)
+	{	
+		UCSRB |= (1 << RXCIE);
+	}
+	else
+	{	
+		UCSRB &= ~(1 << RXCIE);
+	}
+	return;
+}	
+void DisableSerialInterrupt(void)
+{
+	SetSerialInterrupt(0);
+}
+void EnableSerialInterrupt(void)
+{
+	SetSerialInterrupt(1);
+}
 //Inialise the Console			
 void initConsole(void) {
     // Set baud rate
@@ -92,9 +111,10 @@ void initConsole(void) {
     UBRRL = (uint8_t)BAUDRATE;
     // Enable receiver and transmitter
     UCSRB = (1<<RXEN)|(1<<TXEN);
+	
 	//enable the receive interrupt
-	//TODO : make function to enable and disable it, to replace the cli & sei in code
-	UCSRB |= (1 << RXCIE);
+	EnableSerialInterrupt();
+	
     // Set frame format: 8data, 1stop bit
     UCSRC = (1<<URSEL)|(3<<UCSZ0);	
 	

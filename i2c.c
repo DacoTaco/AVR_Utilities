@@ -18,7 +18,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include <avr/interrupt.h>
 #include <util/delay.h>
 #include <stdio.h>
-#include <compat/twi.h>
+#include <util/twi.h>
 #include "i2c.h"
 //#include "serial.h"
 
@@ -89,6 +89,7 @@ void _initI2c(uint8_t* addr, uint8_t inter_enable)
 	if(inter_enable > 0)
 	{
 		I2CInfo.InterruptEnabled = 1;
+		//cb_read = NULL;
 	}
 	
 	if(addr != NULL)
@@ -175,6 +176,7 @@ void resetVariables(void)
 		i2c_data.ReadData[i] = 0;
 		i2c_data.WriteData[i] = 0;
 	}
+	
 	i2c_data.ReadData_Size = 0;
 	i2c_data.WriteData_Size = 0;
 	i2c_data.ret = 0;
@@ -252,7 +254,7 @@ int8_t i2c_write(uint8_t addr,uint16_t write_data,uint8_t size)
 	
 	//prepare the data for the device
 	resetVariables();
-	dev_addr = (ADDR_MASK(addr) + I2C_WRITE);
+	dev_addr = (ADDR_MASK(addr) | I2C_WRITE);
 	
 	i2c_data.WriteData_Size = size;
 	i2c_data.WriteData[0] = (write_data & 0xFF00) >> 8;
@@ -325,7 +327,7 @@ int8_t i2c_read(uint8_t addr,uint16_t* read_data,uint8_t size)
 		_delay_ms(10);
 		
 		//copy over data from i2c_data
-		*read_data = (i2c_data.ReadData[1] << 8) + i2c_data.ReadData[0];
+		*read_data = (i2c_data.ReadData[0] << 8) + i2c_data.ReadData[1];
 				
 		//clear signals, or send repeating start for more data
 		//not needed as we stopped handled that in the ISR
@@ -348,7 +350,7 @@ int8_t i2c_Read8(uint8_t addr,uint8_t* read_data)
 	uint16_t data;
 	int8_t ret;
 	ret = i2c_read(addr,&data,1);
-	*read_data = (data & 0x00FF);
+	*read_data = ((data & 0xFF00) >> 8);
 	return ret;
 }
 int8_t i2c_Read16(uint8_t addr,uint16_t* read_data)
@@ -366,6 +368,9 @@ uint8_t i2c_GetStatus(void)
 ISR(TWI_vect)
 {	
 	uint8_t status = i2c_GetStatus();
+	/*cprintf("status : ");
+	cprintf_char(status);
+	cprintf("\n\r");*/
 	//cprintf("status : '0x%02X'\n\r",status);
 	
 	//OK, so. TWI.
