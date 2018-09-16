@@ -21,19 +21,21 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "settings.h"
 
 void _saveSettings(uint16_t address ,void* data, uint16_t size)
-{
+{	
 	//GTFO if no valid data is given
 	if(data == NULL || size == 0)
 	{
 		return;
 	}
 	
+	uint16_t addr = address;
+	
 	while(eeprom_is_ready() == 0);
 	
 	//disable all interrupts so nothing weird happens in between
 	cli();
 	
-	eeprom_write_block(data, (void*)address, size);
+	eeprom_write_block(data, (void*)addr, size);
 	
 	//reactivate all interrupts
 	sei();
