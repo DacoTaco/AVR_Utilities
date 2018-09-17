@@ -137,35 +137,6 @@ void i2c_Init_addr(uint8_t addr,uint8_t inter_enable)
 	_initI2c(&addr,inter_enable);
 }
 
-
-//FUCKING VOLTILE'S WONT WORK WITH MEMCPY/MEMSET FML!!
-/*void CopyParamToResponse(_i2c_Param* param)
-{
-	if(param == NULL)
-		return;
-	
-	for(uint8_t i=0;i<MAX_TWI_BUFFER_LENGHT;i++)
-	{
-		i2c_data.ReadData[i] = param->ReadData[i];
-		i2c_data.WriteData[i] = param->WriteData[i];
-	}
-	i2c_data.ReadData_Size = param->ReadData_Size;
-	i2c_data.WriteData_Size = param->WriteData_Size;
-	i2c_data.ret = param->ret;
-}
-
-void ClearDataBuffer(void)
-{
-	for(uint8_t i=0;i<MAX_TWI_BUFFER_LENGHT;i++)
-	{
-		i2c_data.ReadData[i] = 0;
-		i2c_data.WriteData[i] = 0;
-	}
-	i2c_data.ReadData_Size = 0;
-	i2c_data.WriteData_Size = 0;
-	i2c_data.ret = 0;
-} */
-
 void resetVariables(void)
 {
 	dev_addr = 0;
@@ -270,6 +241,7 @@ int8_t i2c_write(uint8_t addr,uint16_t write_data,uint8_t size)
 		//while untill all data is send
 		while(response_valid != 0);
 		//delay or otherwise we can be off before fully done xD
+		_delay_us(2);	
 		return i2c_data.ret;
 	}
 	else
@@ -323,6 +295,7 @@ int8_t i2c_read(uint8_t addr,uint16_t* read_data,uint8_t size)
 		//TWI is still processing our data...
 		while(response_valid != 0);
 		//delay or otherwise we can be off before data is read xD
+		_delay_us(2);
 		
 		//copy over data from i2c_data
 		*read_data = (i2c_data.ReadData[0] << 8) | (i2c_data.ReadData[1] & 0xFF);
