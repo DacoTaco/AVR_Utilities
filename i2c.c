@@ -270,7 +270,6 @@ int8_t i2c_write(uint8_t addr,uint16_t write_data,uint8_t size)
 		//while untill all data is send
 		while(response_valid != 0);
 		//delay or otherwise we can be off before fully done xD
-		_delay_ms(10);	
 		return i2c_data.ret;
 	}
 	else
@@ -324,10 +323,9 @@ int8_t i2c_read(uint8_t addr,uint16_t* read_data,uint8_t size)
 		//TWI is still processing our data...
 		while(response_valid != 0);
 		//delay or otherwise we can be off before data is read xD
-		_delay_ms(10);
 		
 		//copy over data from i2c_data
-		*read_data = (i2c_data.ReadData[0] << 8) + i2c_data.ReadData[1];
+		*read_data = (i2c_data.ReadData[0] << 8) | (i2c_data.ReadData[1] & 0xFF);
 				
 		//clear signals, or send repeating start for more data
 		//not needed as we stopped handled that in the ISR
