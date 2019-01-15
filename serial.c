@@ -110,13 +110,13 @@ void initConsole(void) {
     UBRRH = (uint8_t)(BAUDRATE>>8);
     UBRRL = (uint8_t)BAUDRATE;
     // Enable receiver and transmitter
-    UCSRB = (1<<RXEN)|(1<<TXEN);
+    UCSRB |= (1<<RXEN)|(1<<TXEN);
 	
 	//enable the receive interrupt
 	EnableSerialInterrupt();
 	
     // Set frame format: 8data, 1stop bit
-    UCSRC = (1<<URSEL)|(3<<UCSZ0);	
+    UCSRC |= (1<<URSEL)|(3<<UCSZ0);	
 	
 	cb_recv = usart_SendChar;
 	
