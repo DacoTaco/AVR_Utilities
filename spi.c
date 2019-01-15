@@ -36,19 +36,19 @@ volatile uint8_t *_spi_port = &PORTB;
 //Initialize SPI Master Device
 void spi_init()
 {
-	return spi_init_as(0);				
+	return spi_init_as(1);				
 }
 
-void spi_init_as(char _slave)
+void spi_init_as(char _master)
 {
 	if(_spi_mode > 0)
 		return;
 	
-	unsigned char _ddr = _spi_ddr;
-	unsigned char _port = _spi_port;
-	unsigned char _spcr = 0;
+	uint8_t _ddr = *_spi_ddr;
+	uint8_t _port = *_spi_port;
+	uint8_t _spcr = 0;
 	
-	if(_slave = 0)
+	if(_master != 0)
 	{	
 		//Set CS_PIN,SS,MOSI, SCK as Output
 		_ddr |= (1<<CS_PIN)|(1<<SS_PIN)|(1<<MOSI_PIN)|(1<<SCK_PIN);  
@@ -73,12 +73,12 @@ void spi_init_as(char _slave)
 		_spcr = (1<<SPE);    //Enable SPI
 	}
 	
-	_spi_ddr = _ddr;
-	_spi_port = _port;
+	*_spi_ddr = _ddr;
+	*_spi_port = _port;
 	SPCR = _spcr;
 	
 	_spi_mode = 1;
-	if(_slave != 0)
+	if(_master == 0)
 		_spi_mode++;
 	
 	return;
@@ -94,7 +94,7 @@ uint8_t spi_tranceiver_8(uint8_t data)
 	if(_spi_mode == 1)
 	{
 		//in master mode we need to set the CS pin low to signal the slave we are going to transmit data
-		_spi_port &= ~(1<<CS_PIN); //set CS LOW
+		*_spi_port &= ~(1<<CS_PIN); //set CS LOW
 		
 		//give the slave some time to set its data
 		asm("nop");
@@ -107,7 +107,7 @@ uint8_t spi_tranceiver_8(uint8_t data)
 	
 	if(_spi_mode == 1)
 	{
-		_spi_port |= (1<<CS_PIN); //set CS high	
+		*_spi_port |= (1<<CS_PIN); //set CS high	
 	}
 	
 	//Return received data
