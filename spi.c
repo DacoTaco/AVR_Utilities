@@ -50,7 +50,7 @@ void spi_init_as(char _slave)
 	
 	if(_slave = 0)
 	{	
-		//Set PB1,SS,MOSI, SCK as Output
+		//Set CS_PIN,SS,MOSI, SCK as Output
 		_ddr |= (1<<CS_PIN)|(1<<SS_PIN)|(1<<MOSI_PIN)|(1<<SCK_PIN);  
 		//Set MISO as input
 		_ddr &= ~(1<<MISO_PIN);
@@ -58,7 +58,7 @@ void spi_init_as(char _slave)
 		// set MOSI as output LOW & MISO as tristate input
 		_port &= ~((1<<MOSI_PIN)|(1<<MISO_PIN)); 
 		
-		// set PB1 , SS HIGH + set pull up of MISO
+		// set CS_PIN , SS HIGH + set pull up of SCK
 		_port |= ((1<<CS_PIN)|(1<<SS_PIN)|(1<<SCK_PIN)); 
 		
 		//Set as Master
@@ -93,27 +93,21 @@ uint8_t spi_tranceiver_8(uint8_t data)
 	unsigned char d;
 	if(_spi_mode == 1)
 	{
+		//in master mode we need to set the CS pin low to signal the slave we are going to transmit data
 		_spi_port &= ~(1<<CS_PIN); //set CS LOW
 		
 		//give the slave some time to set its data
 		asm("nop");
-		asm("nop");
-		
-		SPDR = data;                       //Load data into the buffer
-		while(!(SPSR & (1<<SPIF) ));       //Wait until transmission complete
-		d = SPDR;
-		
-		_spi_port |= (1<<CS_PIN); //set CS high		              
+		asm("nop");	              
 	}
-	else
+	
+	SPDR = data; // Load data into the buffer
+	while(!(SPSR & (1<<SPIF) )); //Wait until transmission complete
+	d = SPDR; //get data
+	
+	if(_spi_mode == 1)
 	{
-		SPDR = data; // Load data into the buffer
-		while(!(SPSR & (1<<SPIF) ));
-		d = SPDR;
-		
-		//Wait until transmission complete
-		while(!(SPSR & (1<<SPIF) ));
-
+		_spi_port |= (1<<CS_PIN); //set CS high	
 	}
 	
 	//Return received data
