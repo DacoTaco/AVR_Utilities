@@ -17,6 +17,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #define SPI_WRITE 0
 
 void spi_init(void);
-void spi_init_as(char _master);
+void spi_init_as(int8_t master, int8_t control_cs);
 uint8_t spi_tranceiver_8(uint8_t data);
 uint16_t spi_tranceiver(uint16_t data);

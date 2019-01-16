@@ -21,7 +21,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 #include "spi.h"
 
-char _spi_mode = 0;
+int8_t _spi_mode = 0;
+int8_t _control_cs = 0;
 volatile uint8_t *_spi_ddr = &DDRB;
 volatile uint8_t *_spi_port = &PORTB;
 
@@ -36,10 +37,10 @@ volatile uint8_t *_spi_port = &PORTB;
 //Initialize SPI Master Device
 void spi_init()
 {
-	return spi_init_as(1);				
+	return spi_init_as(1,1);				
 }
 
-void spi_init_as(char _master)
+void spi_init_as(int8_t master, int8_t control_cs)
 {
 	if(_spi_mode > 0)
 		return;
@@ -47,11 +48,13 @@ void spi_init_as(char _master)
 	uint8_t _ddr = *_spi_ddr;
 	uint8_t _port = *_spi_port;
 	uint8_t _spcr = 0;
+	_control_cs = control_cs;
 	
-	if(_master != 0)
+	if(master != 0)
 	{	
-		//Set CS_PIN,SS,MOSI, SCK as Output
-		_ddr |= (1<<CS_PIN)|(1<<SS_PIN)|(1<<MOSI_PIN)|(1<<SCK_PIN);  
+		//Set SS,MOSI & SCK as Output
+		_ddr |= ((1<<SS_PIN)|(1<<MOSI_PIN)|(1<<SCK_PIN));  
+
 		//Set MISO as input
 		_ddr &= ~(1<<MISO_PIN);
 		
@@ -59,7 +62,14 @@ void spi_init_as(char _master)
 		_port &= ~((1<<MOSI_PIN)|(1<<MISO_PIN)); 
 		
 		// set CS_PIN , SS HIGH + set pull up of SCK
-		_port |= ((1<<CS_PIN)|(1<<SS_PIN)|(1<<SCK_PIN)); 
+		_port |= ((1<<SS_PIN)|(1<<SCK_PIN)); 
+		
+		if(_control_cs > 0)
+		{
+			//Set CS_PIN as output and set high
+			_ddr |= (1<<CS_PIN);
+			_port |= (1<<CS_PIN);
+		}
 		
 		//Set as Master
 		_spcr = (1<<SPE)|(1<<MSTR);
@@ -78,7 +88,7 @@ void spi_init_as(char _master)
 	SPCR = _spcr;
 	
 	_spi_mode = 1;
-	if(_master == 0)
+	if(master == 0)
 		_spi_mode++;
 	
 	return;
@@ -90,8 +100,8 @@ uint8_t spi_tranceiver_8(uint8_t data)
 	if(_spi_mode < 1)
 		return 0x00;
 	
-	unsigned char d;
-	if(_spi_mode == 1)
+	uint8_t d;
+	if(_spi_mode == 1 && _control_cs == 1)
 	{
 		//in master mode we need to set the CS pin low to signal the slave we are going to transmit data
 		*_spi_port &= ~(1<<CS_PIN); //set CS LOW
@@ -105,7 +115,7 @@ uint8_t spi_tranceiver_8(uint8_t data)
 	while(!(SPSR & (1<<SPIF) )); //Wait until transmission complete
 	d = SPDR; //get data
 	
-	if(_spi_mode == 1)
+	if(_spi_mode == 1 && _control_cs == 1)
 	{
 		*_spi_port |= (1<<CS_PIN); //set CS high	
 	}

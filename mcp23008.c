@@ -21,12 +21,22 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include <util/delay.h>
 #include <string.h>
 
-#include "i2c.h"
+#ifdef _SPI_MODE
+	#include "spi.h"
+	//only accept bit 6 & 7 as addr bits -> 0000 0xx0
+	#define _DEV_ADDR 0x06
+#else
+	#include "i2c.h"
+	//only accept bit 5,6 & 7 as addr bits -> 0000 xxx0
+	#define _DEV_ADDR 0x0E
+#endif
+
+
 #include "serial.h"
 #include "mcp23008.h"
 
 #define REG_ADD(x,y) (uint16_t)((x << 8) | y)
-#define CALC_ADDR(x) (BASE_23008_ADDR | (x & 0x0E))
+#define CALC_ADDR(x) (BASE_23008_ADDR | (x & _DEV_ADDR))
 
 int8_t _mcp23008_init[0x0F] = {0};
 
@@ -35,15 +45,21 @@ void mcp23008_init(uint8_t dev_addr)
 	cprintf_debug("init mcp23008\n\r");
 	cprintf_debug_char(dev_addr);
 	cprintf_debug("\n\r");
-	cprintf_debug_char(_mcp23008_init[dev_addr & 0x0E]);
+	cprintf_debug_char(_mcp23008_init[dev_addr & _DEV_ADDR]);
 	cprintf_debug("\n\r");
-	if(_mcp23008_init[dev_addr & 0x0E] != 0)
+	if(_mcp23008_init[dev_addr & _DEV_ADDR] != 0)
 		return;
 	
 	cprintf_debug("init dev\n\r");
 
+#ifdef _SPI_MODE
+	//we dont control any CS pin. the application will have to arrange that
+	spi_init_as(1,0);
+	cprintf_debug("SPI done\n\r");
+#else
 	i2c_Init();
 	cprintf_debug("i2c done\n\r");
+#endif
 	
 	//uint8_t addr = CALC_ADDR(dev_addr);
 	//dev_addr = CALC_ADDR(dev_addr);
@@ -62,7 +78,7 @@ void mcp23008_init(uint8_t dev_addr)
 	mcp23008_WriteReg(dev_addr,GPIO,0x00);
 	cprintf_debug("GPIO\n\r");
 	
-	_mcp23008_init[dev_addr & 0x0E] = 1;
+	_mcp23008_init[dev_addr & _DEV_ADDR] = 1;
 	cprintf_debug("init!\n\r");
 	
 }
@@ -75,8 +91,17 @@ int8_t mcp23008_ReadReg(uint8_t dev_addr, uint8_t reg,uint8_t* read_data)
 	}
 	
 	uint8_t addr = CALC_ADDR(dev_addr);
+#ifdef _SPI_MODE
+	addr |= SPI_READ;
+	PORTB &= ~(1<<PB1);
+	spi_tranceiver(REG_ADD(addr,reg));
+	*read_data = spi_tranceiver_8(0x00);
+	PORTB |= (1<<PB1);
+	return 1;
+#else
 	i2c_Write8(addr,reg);
 	return i2c_Read8(addr,read_data);
+#endif
 }
 
 int8_t mcp23008_WriteReg(uint8_t dev_addr, uint8_t reg,uint8_t value)
@@ -87,5 +112,16 @@ int8_t mcp23008_WriteReg(uint8_t dev_addr, uint8_t reg,uint8_t value)
 	}
 	
 	uint8_t addr = CALC_ADDR(dev_addr);
+#ifdef _SPI_MODE
+	//this is a moot operation, cause write is 0. just here for completeness
+	//addr |= SPI_WRITE; 
+	
+	PORTB &= ~(1<<PB1);
+	spi_tranceiver(REG_ADD(addr,reg));
+	int8_t d = spi_tranceiver_8(value);
+	PORTB |= (1<<PB1);
+	return d;
+#else
 	return i2c_Write16(addr,REG_ADD(reg,value));
+#endif
 }
