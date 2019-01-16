@@ -1,5 +1,5 @@
 /*
-mcp23008 - An AVR library to communicate with the MCP23008 chip. uses the i2c in this library
+mcp23008 - An AVR library to communicate with the MCP23X08 chip family. uses the i2c or SPI in this library
 Copyright (C) 2018-201x  DacoTaco
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
