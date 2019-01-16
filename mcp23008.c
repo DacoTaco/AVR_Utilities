@@ -53,8 +53,12 @@ void mcp23008_init(uint8_t dev_addr)
 	cprintf_debug("init dev\n\r");
 
 #ifdef _SPI_MODE
-	//we dont control any CS pin. the application will have to arrange that
 	spi_init_as(1,0);
+	
+	//set the CS pin, we will use PB1
+	DDRB |= (1<<PB1);
+	PORTB |= (1<<PB1);
+	
 	cprintf_debug("SPI done\n\r");
 #else
 	i2c_Init();
