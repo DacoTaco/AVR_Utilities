@@ -64,17 +64,20 @@ void mcp23008_init(uint8_t dev_addr)
 	i2c_Init();
 	cprintf_debug("i2c done\n\r");
 #endif
+
+#ifdef _SPI_MODE
+	//enable the addressing registry
+	mcp23008_WriteReg(dev_addr,IOCON,0b00001000);
+#else
+	mcp23008_WriteReg(dev_addr,IOCON,0x00);
+#endif
+	cprintf_debug("IOCON\n\r");
 	
-	//uint8_t addr = CALC_ADDR(dev_addr);
-	//dev_addr = CALC_ADDR(dev_addr);
 	//basically, all we do is set all the default value's. just to be sure the device is set as expected
 	mcp23008_WriteReg(dev_addr,IODIR,0xFF);	
 	cprintf_debug("IODIR\n\r");	
-	
 	mcp23008_WriteReg(dev_addr,GPINTEN,0x00);
 	cprintf_debug("GPINTEN\n\r");
-	mcp23008_WriteReg(dev_addr,IOCON,0x00);
-	cprintf_debug("IOCON\n\r");
 	mcp23008_WriteReg(dev_addr,IPOL,0x00);
 	cprintf_debug("IPOL\n\r");
 	mcp23008_WriteReg(dev_addr,GPPU,0x00);

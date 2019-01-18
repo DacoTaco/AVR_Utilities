@@ -85,6 +85,7 @@ void spi_init_as(int8_t master, int8_t control_cs)
 	
 	*_spi_ddr = _ddr;
 	*_spi_port = _port;
+	SPSR = (1<<SPI2X);
 	SPCR = _spcr;
 	
 	_spi_mode = 1;
