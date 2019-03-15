@@ -53,7 +53,7 @@ void mcp23008_init(uint8_t dev_addr)
 	cprintf_debug("init dev\n\r");
 
 #ifdef _SPI_MODE
-	spi_init_as(1,0);
+	spi_init_as(1);
 	
 	//set the CS pin, we will use PB1
 	DDRB |= (1<<PB1);
@@ -90,7 +90,7 @@ void mcp23008_init(uint8_t dev_addr)
 	
 }
 
-int8_t mcp23008_ReadReg(uint8_t dev_addr, uint8_t reg,uint8_t* read_data)
+inline int8_t mcp23008_ReadReg(uint8_t dev_addr, uint8_t reg,uint8_t* read_data)
 {
 	if(reg > 0x0A || read_data == NULL)
 	{
@@ -111,7 +111,7 @@ int8_t mcp23008_ReadReg(uint8_t dev_addr, uint8_t reg,uint8_t* read_data)
 #endif
 }
 
-int8_t mcp23008_WriteReg(uint8_t dev_addr, uint8_t reg,uint8_t value)
+inline int8_t mcp23008_WriteReg(uint8_t dev_addr, uint8_t reg,uint8_t value)
 {
 	if(reg < 0 || reg > 0x0A)
 	{

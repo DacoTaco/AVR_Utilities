@@ -22,7 +22,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "spi.h"
 
 int8_t _spi_mode = 0;
-int8_t _control_cs = 0;
 volatile uint8_t *_spi_ddr = &DDRB;
 volatile uint8_t *_spi_port = &PORTB;
 
@@ -37,10 +36,10 @@ volatile uint8_t *_spi_port = &PORTB;
 //Initialize SPI Master Device
 void spi_init()
 {
-	return spi_init_as(1,1);				
+	return spi_init_as(1);				
 }
 
-void spi_init_as(int8_t master, int8_t control_cs)
+void spi_init_as(int8_t master)
 {
 	if(_spi_mode > 0)
 		return;
@@ -48,7 +47,6 @@ void spi_init_as(int8_t master, int8_t control_cs)
 	uint8_t _ddr = *_spi_ddr;
 	uint8_t _port = *_spi_port;
 	uint8_t _spcr = 0;
-	_control_cs = control_cs;
 	
 	if(master != 0)
 	{	
@@ -64,12 +62,11 @@ void spi_init_as(int8_t master, int8_t control_cs)
 		// set CS_PIN , SS HIGH + set pull up of SCK
 		_port |= ((1<<SS_PIN)|(1<<SCK_PIN)); 
 		
-		if(_control_cs > 0)
-		{
+#ifdef _CONTROL_CS_PIN
 			//Set CS_PIN as output and set high
 			_ddr |= (1<<CS_PIN);
 			_port |= (1<<CS_PIN);
-		}
+#endif
 		
 		//Set as Master
 		_spcr = (1<<SPE)|(1<<MSTR);
@@ -96,41 +93,42 @@ void spi_init_as(int8_t master, int8_t control_cs)
 }
 
 //Function to send and receive data
-uint8_t spi_tranceiver_8(uint8_t data)
+inline uint8_t spi_tranceiver_8(uint8_t data)
 {
-	if(_spi_mode < 1)
+	if(_spi_mode == 0)
 		return 0x00;
 	
-	uint8_t d;
-	if(_spi_mode == 1 && _control_cs == 1)
+#ifdef _CONTROL_CS_PIN
+	if(_spi_mode == 1)
 	{
 		//in master mode we need to set the CS pin low to signal the slave we are going to transmit data
 		*_spi_port &= ~(1<<CS_PIN); //set CS LOW
 		
 		//give the slave some time to set its data
-		asm("nop");
 		asm("nop");	              
 	}
+#endif
 	
 	SPDR = data; // Load data into the buffer
 	while(!(SPSR & (1<<SPIF) )); //Wait until transmission complete
-	d = SPDR; //get data
+	data = SPDR; //get data
 	
-	if(_spi_mode == 1 && _control_cs == 1)
+#ifdef _CONTROL_CS_PIN
+	if(_spi_mode == 1)
 	{
 		*_spi_port |= (1<<CS_PIN); //set CS high	
 	}
+#endif
 	
 	//Return received data
-	return d; 
+	return data; 
 }
 
-uint16_t spi_tranceiver(uint16_t data)
+inline uint16_t spi_tranceiver(uint16_t data)
 {
-	uint8_t d = data >> 8;
 	uint16_t r = 0x00;
 	
-	r = spi_tranceiver_8(d) << 8;
+	r = spi_tranceiver_8(data >> 8) << 8;
 	r = r | spi_tranceiver_8(data & 0xFF);
     return(r);
 }

@@ -39,7 +39,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #endif
 
 // define baudrate
-#define BAUDRATE ((F_CPU)/(BAUD*16UL)-1)			// set baud rate value for UBRR
+#define BAUDRATE ((F_CPU)/(BAUD*8UL)-1)			// set baud rate value for UBRR
 
 char _serial_init = 0;
 
@@ -107,10 +107,12 @@ void EnableSerialInterrupt(void)
 //Inialise the Console			
 void initConsole(void) {
     // Set baud rate
-    UBRRH = (uint8_t)(BAUDRATE>>8);
+	UBRRH = (uint8_t)(BAUDRATE>>8);
     UBRRL = (uint8_t)BAUDRATE;
+
     // Enable receiver and transmitter
     UCSRB |= (1<<RXEN)|(1<<TXEN);
+	UCSRA |= (1<<U2X);
 	
 	//enable the receive interrupt
 	EnableSerialInterrupt();
