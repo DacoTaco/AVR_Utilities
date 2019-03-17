@@ -43,7 +43,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 char _serial_init = 0;
 
-
 //callbacks
 void (*cb_recv)(char); 
 
@@ -54,7 +53,11 @@ void setSerialRecvCallback(void* cb)
 }
 
 //Send a Char to the Other side
-void usart_SendChar(char data) {
+void usart_SendChar(char data) 
+{
+	if(_serial_init == 0)
+		return;
+	
     // Wait for empty transmit buffer
     while ( !(UCSRA & (_BV(UDRE))) );
     // Start transmission
@@ -64,7 +67,7 @@ void usart_SendChar(char data) {
 //Send a string to the other side
 void usart_SendString(char *s) {
 	
-	if(s == NULL)
+	if(_serial_init == 0 || s == NULL)
 	{
 		return;
 	}
@@ -78,31 +81,29 @@ void usart_SendString(char *s) {
 
 //Wait untill a single Char is received
 //kinda useless as we have the interrupt xD
-unsigned char usart_GetChar(void) {
+unsigned char usart_GetChar(void) 
+{
+	if(_serial_init == 0)
+		return 0x00;
+	
     // Wait for incoming data
     while ( !(UCSRA & (_BV(RXC))) );
     // Return the data
     return UDR;
-}    
-void SetSerialInterrupt(int8_t enable)
-{
-	if(enable > 0)
-	{	
-		UCSRB |= (1 << RXCIE);
-	}
-	else
-	{	
-		UCSRB &= ~(1 << RXCIE);
-	}
-	return;
-}	
+}
 void DisableSerialInterrupt(void)
 {
-	SetSerialInterrupt(0);
+	if(_serial_init == 0)
+		return;
+	
+	UCSRB &= ~(1 << RXCIE);
 }
 void EnableSerialInterrupt(void)
 {
-	SetSerialInterrupt(1);
+	if(_serial_init == 0)
+		return;
+	
+	UCSRB |= (1 << RXCIE);
 }
 //Inialise the Console			
 void initConsole(void) {
@@ -114,9 +115,6 @@ void initConsole(void) {
     UCSRB |= (1<<RXEN)|(1<<TXEN);
 	UCSRA |= (1<<U2X);
 	
-	//enable the receive interrupt
-	EnableSerialInterrupt();
-	
     // Set frame format: 8data, 1stop bit
     UCSRC |= (1<<URSEL)|(3<<UCSZ0);	
 	
@@ -126,34 +124,24 @@ void initConsole(void) {
 	sei();
 	
 	_serial_init = 1;
+		
+	//enable the receive interrupt
+	EnableSerialInterrupt();
+	
 	return;
 }
-//Wait and retrieve 1 byte
-unsigned char Serial_ReadByte(void)
-{
-	if(_serial_init == 0)
-		return 0x00;
-		
-	return usart_GetChar();
-}             
 
-//Print a single character
-void cprintf_char( unsigned char text )
-{
-	if(_serial_init == 0)
-		return;
-
-	usart_SendChar(text);
-}
+//some top level functions are actually alias'
 
 //Print a full string
-void CPRINTF_STR_NAME(char* str)
-{
-	if(_serial_init == 0)
-		return;
+void cprintf_string(char* str) __attribute__((alias("usart_SendString")));
 
-	usart_SendString(str);	
-}
+//Wait and retrieve 1 byte
+unsigned char Serial_ReadByte(void) __attribute__((alias("usart_GetChar")));
+
+//Print a single character
+void cprintf_char( unsigned char text ) __attribute__((alias("usart_SendChar")));
+
 
 #ifdef _VA_SUPPORT
 //Print a string

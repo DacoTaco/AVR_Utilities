@@ -111,11 +111,11 @@ inline int8_t mcp23008_ReadReg(uint8_t dev_addr, uint8_t reg,uint8_t* read_data)
 #endif
 }
 
-inline int8_t mcp23008_WriteReg(uint8_t dev_addr, uint8_t reg,uint8_t value)
+inline void mcp23008_WriteReg(uint8_t dev_addr, uint8_t reg,uint8_t value)
 {
 	if(reg < 0 || reg > 0x0A)
 	{
-		return 0;
+		return;
 	}
 	
 	uint8_t addr = CALC_ADDR(dev_addr);
@@ -125,10 +125,11 @@ inline int8_t mcp23008_WriteReg(uint8_t dev_addr, uint8_t reg,uint8_t value)
 	
 	PORTB &= ~(1<<PB1);
 	spi_tranceiver(REG_ADD(addr,reg));
-	int8_t d = spi_tranceiver_8(value);
+	spi_tranceiver_8(value);
 	PORTB |= (1<<PB1);
-	return d;
+	return;
 #else
-	return i2c_Write16(addr,REG_ADD(reg,value));
+	i2c_Write16(addr,REG_ADD(reg,value));
+	return;
 #endif
 }

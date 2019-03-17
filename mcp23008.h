@@ -70,4 +70,4 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 void mcp23008_init(uint8_t dev_addr);
 int8_t mcp23008_ReadReg(uint8_t dev_addr, uint8_t reg,uint8_t* read_data);
-int8_t mcp23008_WriteReg(uint8_t dev_addr, uint8_t reg,uint8_t value);
+void mcp23008_WriteReg(uint8_t dev_addr, uint8_t reg,uint8_t value);

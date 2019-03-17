@@ -20,12 +20,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #undef _VA_SUPPORT
 #endif
 
-#ifdef _VA_SUPPORT
-#define CPRINTF_STR_NAME cprintf_string
-#else
-#define CPRINTF_STR_NAME cprintf
-#endif
-
 #ifdef DEBUG
 	#define cprintf_debug(x) cprintf(x)
 	#define cprintf_debug_char(x) cprintf_char(x)
@@ -41,9 +35,10 @@ void EnableSerialInterrupt(void);
 
 unsigned char Serial_ReadByte(void);
 void cprintf_char( unsigned char text );
+void cprintf_string(char* str);
 
 #ifdef _VA_SUPPORT
 void cprintf( char *text,... ); 
+#else
+#define cprintf cprintf_string
 #endif 
-
-void CPRINTF_STR_NAME(char* str);
