@@ -41,7 +41,7 @@ void spi_init()
 
 void spi_init_as(int8_t master)
 {
-	if(_spi_mode > 0)
+	if(_spi_mode != 0)
 		return;
 	
 	uint8_t _ddr = *_spi_ddr;

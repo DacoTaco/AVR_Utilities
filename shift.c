@@ -74,7 +74,7 @@ int8_t Shift_Init(volatile uint8_t *Shift_DDR,volatile uint8_t *Shift_Port,volat
 	return 1;
 	
 }
-int8_t ShiftData(uint8_t data)
+int8_t ShiftData(uint16_t data)
 {
 	if(_shift_init == 0)
 		return -1;

@@ -15,4 +15,4 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 int8_t Shift_Init(volatile uint8_t *Shift_DDR,volatile uint8_t *Shift_Port,volatile uint8_t *Shift_Pin,
 				volatile uint8_t *Latch_Pin,volatile uint8_t *Data_Pin,volatile uint8_t *Clock_Pin);
-int8_t ShiftData(uint8_t data);
+int8_t ShiftData(uint16_t data);
